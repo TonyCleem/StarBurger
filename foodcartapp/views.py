@@ -5,6 +5,8 @@ from django.templatetags.static import static
 
 
 from .models import Product
+from .models import Order
+from .models import OrderProduct
 
 
 def banners_list_api(request):
@@ -60,8 +62,34 @@ def product_list_api(request):
 
 
 def register_order(request):
-    response = json.loads(request.body.decode())
-    print(response)
+    # {'products': [{'product': 1, 'quantity': 1}, {'product': 3, 'quantity': 1}],
+    #  'firstname': 'Антон', 'lastname': 'Климов', 'phonenumber': '+79994683343', 'address': 'Москва'}
+    order_from_site = json.loads(request.body.decode())
+
+    firstname = order_from_site['firstname']
+    lastname = order_from_site['lastname']
+    phonenumber = order_from_site['phonenumber']
+    address = order_from_site['address']
+
+    order = Order.objects.create(
+        firstname=firstname,
+        lastname=lastname,
+        phonenumber = phonenumber,
+        address = address
+    )
+
+    ordered_products = order_from_site['products']
+
+    for product in ordered_products:
+        product_id = product['product']
+        quantity = product['quantity']
+
+        ordered_product = OrderProduct.objects.create(
+            order_id = order.id,
+            product_id = product_id,
+            quantity = quantity
+        )
+
     return JsonResponse({})
    
     
