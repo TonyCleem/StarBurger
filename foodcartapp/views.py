@@ -62,8 +62,6 @@ def product_list_api(request):
 
 
 def register_order(request):
-    # {'products': [{'product': 1, 'quantity': 1}, {'product': 3, 'quantity': 1}],
-    #  'firstname': 'Антон', 'lastname': 'Климов', 'phonenumber': '+79994683343', 'address': 'Москва'}
     order_from_site = json.loads(request.body.decode())
 
     firstname = order_from_site['firstname']
