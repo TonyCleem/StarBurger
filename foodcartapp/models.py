@@ -163,6 +163,7 @@ class OrderProduct(models.Model):
         verbose_name = 'заказанные продукты',
         related_name = 'ordered_products',
         on_delete = models.CASCADE,
+    )
     
     quantity = models.IntegerField(
         default = 0,
