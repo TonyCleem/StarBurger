@@ -1,0 +1,66 @@
+{% extends 'base_restaurateur_page.html' %}
+{% load  admin_urls %}
+
+{% block title %}Необработанные заказы | Star Burger{% endblock %}
+
+{% block content %}
+  <center>
+    <h2>Необработанные заказы</h2>
+  </center>
+
+  <hr/>
+  <br/>
+  <br/>
+  <div class="container">
+   <table class="table table-responsive">
+    <tr>
+      <th>ID заказа</th>
+      <th>Статус</th>
+      <th>Способ оплаты</th>
+      <th>Стоимость заказа</th>
+      <th>Клиент</th>
+      <th>Телефон</th>
+      <th>Адрес доставки</th>
+      <th>Комментарий</th>
+      <th>Рестораны</th>
+      <th>Ссылка на админку</th>
+    </tr>
+
+    {% for item in orders_with_restaurants %}
+      <tr>
+        <td>{{ item.order.id }}</td>
+        <td>{{ item.order.get_status_display }}</td>
+        <td>{{ item.order.get_payment_method_display }}</td>
+        <td>{{ item.order.total_price }}</td>
+        <td>{{ item.order.firstname }} {{ item.order.lastname }}</td>
+        <td>{{ item.order.phonenumber }}</td>
+        <td>{{ item.order.address }}</td>
+        <td>{{ item.order.comment }}</td>
+
+        <td>
+          {% if item.restaurant_status.type == "confirmed" %}
+            Готовит {{ item.restaurant_status.name }}
+
+          {% elif item.restaurant_status.type == "suggested" %}
+            <details>
+              <summary>Может быть приготовлен ресторанами:</summary>
+              {% for restaurant in item.restaurant_status.restaurants %}
+                <div>
+                  {{ restaurant.name }} - {{ restaurant.distance }} км
+                </div>
+              {% endfor %}
+            </details>
+
+          {% elif item.restaurant_status.type == "error" %}
+            {{ item.restaurant_status.message }}
+          {% endif %}
+        </td>
+
+        <td>
+          <a href="{% url 'admin:foodcartapp_order_change' item.order.id %}?next={{ request.path|urlencode }}">Редактировать</a>
+        </td>
+      </tr>
+    {% endfor %}
+   </table>
+  </div>
+{% endblock %}
