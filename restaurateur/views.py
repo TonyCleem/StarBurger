@@ -4,6 +4,7 @@ from geopy import distance
 from dotenv import load_dotenv
 
 from django import forms
+from django.conf import settings
 from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
@@ -11,6 +12,7 @@ from django.views import View
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import user_passes_test
+from geolocation.models import PlaceCoordinates
 
 from foodcartapp.models import Order, Product, Restaurant
 
@@ -110,9 +112,6 @@ def view_restaurants(request):
 
 @user_passes_test(is_manager, login_url="restaurateur:login")
 def view_orders(request):
-    load_dotenv()
-    api_key = os.getenv("YANDEX_API_KEY")
-
     orders = (
         Order.objects.all()
         .with_total_price()
@@ -124,7 +123,7 @@ def view_orders(request):
         orders_with_restaurants.append(
             {
                 "order": order,
-                "restaurant_status": build_status(api_key, order),
+                "restaurant_status": build_status(order),
             }
         )
 
@@ -147,14 +146,14 @@ def get_order_restaurants(order):
     )
 
 
-def calc_distances(api_key, order, restaurants):
-    order_coords = fetch_coordinates(api_key, order.address)
+def calc_distances(order, restaurants):
+    order_coords = fetch_coordinates(order.address)
     if not order_coords:
         raise ValueError
 
     result = []
     for restaurant in restaurants:
-        coordinates = fetch_coordinates(api_key, restaurant.address)
+        coordinates = fetch_coordinates(restaurant.address)
         if not coordinates:
             raise ValueError
 
@@ -169,7 +168,7 @@ def calc_distances(api_key, order, restaurants):
     return sorted(result, key=lambda restaurant_info: restaurant_info["distance"])
 
 
-def build_status(api_key, order):
+def build_status(order):
     if order.confirmed_restaurant:
         return {
             "type": "confirmed",
@@ -184,7 +183,7 @@ def build_status(api_key, order):
         }
 
     try:
-        dist = calc_distances(api_key, order, restaurants)
+        dist = calc_distances(order, restaurants)
         return {
             "type": "suggested",
             "restaurants": dist,
@@ -196,10 +195,8 @@ def build_status(api_key, order):
         }
 
 
-from geolocation.models import PlaceCoordinates
-
-
-def fetch_coordinates(apikey, address):
+def fetch_coordinates(address):
+    apikey = settings.YANDEX_API_KEY
     try:
         cached = PlaceCoordinates.objects.get(address=address)
         return (cached.lat, cached.lon)

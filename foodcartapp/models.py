@@ -129,7 +129,8 @@ class Order(models.Model):
     firstname = models.CharField("Имя", max_length=50)
     lastname = models.CharField("Фамилия", max_length=50)
     phonenumber = PhoneNumberField(
-        "Номер телефона", blank=True, help_text="Контактный телефон"
+        "Номер телефона",
+        help_text="Контактный телефон",
     )
     address = models.TextField("Адрес", max_length=100)
     comment = models.TextField("Комментарий", max_length=100, default="", blank=True)
