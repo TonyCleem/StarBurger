@@ -125,20 +125,27 @@ class Order(models.Model):
         "non-cash": "Электронно",
     }
 
-    status = models.CharField(max_length=50, choices=STATUS_CHOISE, default="manager")
+    status = models.CharField(
+        max_length=50, choices=STATUS_CHOISE, default="Не обработан", db_index=True
+    )
     firstname = models.CharField("Имя", max_length=50)
     lastname = models.CharField("Фамилия", max_length=50)
     phonenumber = PhoneNumberField(
-        "Номер телефона",
-        help_text="Контактный телефон",
+        "Номер телефона", help_text="Контактный телефон", db_index=True
     )
-    address = models.TextField("Адрес", max_length=100)
-    comment = models.TextField("Комментарий", max_length=100, default="", blank=True)
-    registration_date = models.DateTimeField("Дата регистрации", default=timezone.now)
-    call_date = models.DateTimeField("Дата звонка", null=True, blank=True)
-    delivery_date = models.DateTimeField("Дата доставки", null=True, blank=True)
+    address = models.TextField("Адрес")
+    comment = models.TextField("Комментарий", null=True, blank=True)
+    registration_date = models.DateTimeField(
+        "Дата регистрации", default=timezone.now, db_index=True
+    )
+    call_date = models.DateTimeField(
+        "Дата звонка", null=True, blank=True, db_index=True
+    )
+    delivery_date = models.DateTimeField(
+        "Дата доставки", null=True, blank=True, db_index=True
+    )
     payment_method = models.CharField(
-        "Способ оплаты", choices=PAYMENT_METHOD, default="", blank=True
+        "Способ оплаты", choices=PAYMENT_METHOD, default="", blank=True, db_index=True
     )
     confirmed_restaurant = models.ForeignKey(
         Restaurant,
@@ -152,7 +159,7 @@ class Order(models.Model):
     objects = OrderQuerySet.as_manager()
 
     class Meta:
-        verbose_name = ("Заказ",)
+        verbose_name = "Заказ"
         verbose_name_plural = "Заказы"
 
     def __str__(self):
@@ -162,19 +169,19 @@ class Order(models.Model):
 class OrderProduct(models.Model):
     order = models.ForeignKey(
         Order,
-        verbose_name="выполненный заказ",
-        related_name="position",
+        verbose_name="Заказ",
+        related_name="positions",
         on_delete=models.CASCADE,
     )
     product = models.ForeignKey(
         Product,
-        verbose_name="заказанные продукты",
+        verbose_name="Продукт",
         related_name="ordered_products",
         on_delete=models.CASCADE,
     )
 
     product_price = models.DecimalField(
-        "Цена продукта",
+        "Цена",
         max_digits=8,
         decimal_places=2,
         validators=[MinValueValidator(0)],
