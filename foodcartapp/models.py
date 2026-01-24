@@ -179,7 +179,6 @@ class OrderProduct(models.Model):
         related_name="ordered_products",
         on_delete=models.CASCADE,
     )
-
     product_price = models.DecimalField(
         "Цена",
         max_digits=8,
@@ -187,7 +186,7 @@ class OrderProduct(models.Model):
         validators=[MinValueValidator(0)],
     )
 
-    quantity = models.IntegerField(default=0, verbose_name="количество продуктов")
+    quantity = models.IntegerField(default=1, verbose_name="количество продуктов")
 
     class Meta:
         verbose_name_plural = "Детали заказа"
