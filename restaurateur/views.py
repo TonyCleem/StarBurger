@@ -1,11 +1,7 @@
-import os
-import requests
 from geopy import distance
-from dotenv import load_dotenv
+from operator import itemgetter
 
 from django import forms
-from django.conf import settings
-from django.db.models import Count
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -51,7 +47,7 @@ class LoginView(View):
             user = authenticate(request, username=username, password=password)
             if user:
                 login(request, user)
-                if user.is_staff:  # FIXME replace with specific permission
+                if user.is_staff:
                     return redirect("restaurateur:RestaurantView")
                 return redirect("start_page")
 
@@ -70,7 +66,7 @@ class LogoutView(auth_views.LogoutView):
 
 
 def is_manager(user):
-    return user.is_staff  # FIXME replace with specific permission
+    return user.is_staff
 
 
 @user_passes_test(is_manager, login_url="restaurateur:login")
@@ -115,7 +111,8 @@ def view_orders(request):
     orders = (
         Order.objects.all()
         .with_total_price()
-        .prefetch_related("position__product__menu_items__restaurant")
+        .with_available_restaurants()
+        .prefetch_related("positions__product")
     )
 
     orders_with_restaurants = []
@@ -134,30 +131,27 @@ def view_orders(request):
     )
 
 
-def get_order_restaurants(order):
-    order_products = order.position.values_list("product_id", flat=True)
-
-    return (
-        Restaurant.objects.filter(
-            menu_items__availability=True, menu_items__product_id__in=order_products
-        )
-        .annotate(matches=Count("menu_items"))
-        .filter(matches=len(order_products))
-    )
-
-
 def calc_distances(order, restaurants):
-    order_coords = fetch_coordinates(order.address)
+    all_addresses = [order.address]
+    for restaurant in restaurants:
+        all_addresses.append(restaurant.address)
+
+    coordinates_query = PlaceCoordinates.objects.filter(address__in=all_addresses)
+    coordinates_by_address = {}
+    for coord in coordinates_query:
+        coordinates_by_address[coord.address] = (coord.lat, coord.lon)
+
+    order_coords = coordinates_by_address.get(order.address)
     if not order_coords:
         raise ValueError
 
     result = []
     for restaurant in restaurants:
-        coordinates = fetch_coordinates(restaurant.address)
-        if not coordinates:
+        restaurant_coords = coordinates_by_address.get(restaurant.address)
+        if not restaurant_coords:
             raise ValueError
 
-        dist = distance.distance(order_coords, coordinates).km
+        dist = distance.distance(order_coords, restaurant_coords).km
         result.append(
             {
                 "name": restaurant.name,
@@ -165,7 +159,8 @@ def calc_distances(order, restaurants):
             }
         )
 
-    return sorted(result, key=lambda restaurant_info: restaurant_info["distance"])
+    result.sort(key=itemgetter("distance"))
+    return result
 
 
 def build_status(order):
@@ -175,7 +170,7 @@ def build_status(order):
             "name": order.confirmed_restaurant.name,
         }
 
-    restaurants = get_order_restaurants(order)
+    restaurants = order.available_restaurants
     if not restaurants:
         return {
             "type": "error",
@@ -193,35 +188,3 @@ def build_status(order):
             "type": "error",
             "message": "Ошибка определения координат",
         }
-
-
-def fetch_coordinates(address):
-    apikey = settings.YANDEX_API_KEY
-    try:
-        cached = PlaceCoordinates.objects.get(address=address)
-        return (cached.lat, cached.lon)
-    except PlaceCoordinates.DoesNotExist:
-        pass
-
-    try:
-        response = requests.get(
-            "https://geocode-maps.yandex.ru/1.x",
-            params={
-                "geocode": address,
-                "apikey": apikey,
-                "format": "json",
-            },
-            timeout=3,
-        )
-        response.raise_for_status()
-        found_places = response.json()["response"]["GeoObjectCollection"][
-            "featureMember"
-        ]
-        if not found_places:
-            return None
-
-        lon, lat = found_places[0]["GeoObject"]["Point"]["pos"].split(" ")
-        PlaceCoordinates.objects.create(address=address, lat=float(lat), lon=float(lon))
-        return (float(lat), float(lon))
-    except Exception:
-        return None
