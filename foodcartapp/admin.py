@@ -125,8 +125,7 @@ class OrderAdmin(admin.ModelAdmin):
     form = ModelForm
 
     def response_change(self, request, obj):
-        origin_response = super(Order, self).response_change(request, obj)
-
+        origin_response = super().response_change(request, obj)
         next_url = request.GET.get("next")
 
         if next_url and url_has_allowed_host_and_scheme(

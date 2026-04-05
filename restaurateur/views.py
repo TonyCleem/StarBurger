@@ -9,8 +9,10 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import user_passes_test
 from geolocation.models import PlaceCoordinates
+from geolocation.views import get_coordinates
 
 from foodcartapp.models import Order, Product, Restaurant
+from django.conf import settings
 
 
 class Login(forms.Form):
@@ -109,18 +111,35 @@ def view_restaurants(request):
 @user_passes_test(is_manager, login_url="restaurateur:login")
 def view_orders(request):
     orders = (
-        Order.objects.all()
+        Order.objects.exclude(status__in=["courier", "client"])
+        .prefetch_related("positions__product")
         .with_total_price()
         .with_available_restaurants()
-        .prefetch_related("positions__product")
     )
+
+    all_addresses = set()
+    for order in orders:
+        all_addresses.add(order.address)
+        for restaurant in order.available_restaurants:
+            all_addresses.add(restaurant.address)
+
+    coordinates_query = PlaceCoordinates.objects.filter(address__in=all_addresses)
+    coordinates_by_address = {
+        coord.address: (coord.lat, coord.lon)
+        for coord in coordinates_query
+    }
+
+    for address in all_addresses - set(coordinates_by_address.keys()):
+        coords = get_coordinates(address, settings.YANDEX_API_KEY)
+        if coords:
+            coordinates_by_address[address] = coords
 
     orders_with_restaurants = []
     for order in orders:
         orders_with_restaurants.append(
             {
                 "order": order,
-                "restaurant_status": build_status(order),
+                "restaurant_status": build_status(order, coordinates_by_address),
             }
         )
 
@@ -131,16 +150,7 @@ def view_orders(request):
     )
 
 
-def calc_distances(order, restaurants):
-    all_addresses = [order.address]
-    for restaurant in restaurants:
-        all_addresses.append(restaurant.address)
-
-    coordinates_query = PlaceCoordinates.objects.filter(address__in=all_addresses)
-    coordinates_by_address = {}
-    for coord in coordinates_query:
-        coordinates_by_address[coord.address] = (coord.lat, coord.lon)
-
+def calc_distances(order, restaurants, coordinates_by_address):
     order_coords = coordinates_by_address.get(order.address)
     if not order_coords:
         raise ValueError
@@ -163,7 +173,7 @@ def calc_distances(order, restaurants):
     return result
 
 
-def build_status(order):
+def build_status(order, coordinates_by_address):
     if order.confirmed_restaurant:
         return {
             "type": "confirmed",
@@ -178,7 +188,7 @@ def build_status(order):
         }
 
     try:
-        dist = calc_distances(order, restaurants)
+        dist = calc_distances(order, restaurants, coordinates_by_address)
         return {
             "type": "suggested",
             "restaurants": dist,

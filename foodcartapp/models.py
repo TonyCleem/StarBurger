@@ -110,13 +110,13 @@ class RestaurantMenuItem(models.Model):
 class OrderQuerySet(models.QuerySet):
     def with_total_price(self):
         return self.annotate(
-            total_price=Sum(F("position__product__price") * F("position__quantity"))
+            total_price=Sum(F("positions__product__price") * F("positions__quantity"))
         )
 
     def with_available_restaurants(self):
         menu_items = RestaurantMenuItem.objects.filter(
             availability=True
-        ).select_related('restaurant', 'product')
+        ).select_related("restaurant", "product")
 
         restaurant_products = defaultdict(set)
         for item in menu_items:
@@ -125,7 +125,9 @@ class OrderQuerySet(models.QuerySet):
         orders = list(self)
 
         for order in orders:
-            order_products = set(order.positions.values_list('product_id', flat=True))
+            order_products = set(
+                position.product_id for position in order.positions.all()
+            )
 
             available_restaurants = []
 
@@ -160,7 +162,7 @@ class Order(models.Model):
         "Номер телефона", help_text="Контактный телефон", db_index=True
     )
     address = models.TextField("Адрес")
-    comment = models.TextField("Комментарий", null=True, blank=True)
+    comment = models.TextField("Комментарий", blank=True)
     registration_date = models.DateTimeField(
         "Дата регистрации", default=timezone.now, db_index=True
     )
@@ -171,7 +173,7 @@ class Order(models.Model):
         "Дата доставки", null=True, blank=True, db_index=True
     )
     payment_method = models.CharField(
-        "Способ оплаты", choices=PAYMENT_METHOD, default="", blank=True, db_index=True
+        "Способ оплаты", choices=PAYMENT_METHOD, db_index=True
     )
     confirmed_restaurant = models.ForeignKey(
         Restaurant,
