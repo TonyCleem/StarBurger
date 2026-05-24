@@ -111,7 +111,7 @@ def view_restaurants(request):
 @user_passes_test(is_manager, login_url="restaurateur:login")
 def view_orders(request):
     orders = (
-        Order.objects.exclude(status__in=["courier", "client"])
+        Order.objects.exclude(status="client")
         .prefetch_related("positions__product")
         .with_total_price()
         .with_available_restaurants()
@@ -189,12 +189,12 @@ def build_status(order, coordinates_by_address):
 
     try:
         dist = calc_distances(order, restaurants, coordinates_by_address)
-        return {
-            "type": "suggested",
-            "restaurants": dist,
-        }
-    except Exception:
+    except ValueError:
         return {
             "type": "error",
             "message": "Ошибка определения координат",
         }
+    return {
+        "type": "suggested",
+        "restaurants": dist,
+    }

@@ -13,7 +13,8 @@ def fetch_coordinates(apikey, address):
             "format": "json",
         },
     )
-    response.raise_for_status()
+    if not response.ok:
+        return None
     found_places = response.json()["response"]["GeoObjectCollection"]["featureMember"]
     if not found_places:
         return None
